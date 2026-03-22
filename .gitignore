@@ -13,3 +13,5 @@ coverage/
 *.tsbuildinfo
 .env
 .env.*
+.kanhelper/
+docs/tasks/
