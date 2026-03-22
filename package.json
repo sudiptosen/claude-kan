@@ -1,0 +1,50 @@
+{
+  "name": "claude-kan",
+  "version": "1.0.1",
+  "description": "Persistent file-based Kanban system for Claude Code with 10+ skills for seamless task management",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "claude-kan": "dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc && npm run copy-templates",
+    "copy-templates": "cp -r src/templates dist/",
+    "prepublishOnly": "npm run build"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "docs/assets/"
+  ],
+  "keywords": [
+    "claude",
+    "claude-code",
+    "kanban",
+    "task-management",
+    "productivity",
+    "cli",
+    "workflow"
+  ],
+  "author": "Sudipto Sen",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sudiptosen/claude-kan.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sudiptosen/claude-kan/issues"
+  },
+  "homepage": "https://github.com/sudiptosen/claude-kan#readme",
+  "dependencies": {
+    "yaml": "^2.3.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
