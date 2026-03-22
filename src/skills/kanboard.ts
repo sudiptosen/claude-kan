@@ -113,7 +113,16 @@ function displayKanban() {
           : (isLastCard ? '│  └─' : '│  ├─');
 
         const sessionTag = colors.dim(`[${card.session.slice(0, 8)}]`);
-        console.log(colors.dim(cardPrefix) + ' ' + card.title + ' ' + sessionTag);
+
+        // Add progress indicator if card has steps
+        let progressTag = '';
+        if (card.progress && card.progress.total > 0) {
+          const { completed, total, percentage } = card.progress;
+          const progressColor = percentage === 100 ? colors.green : colors.cyan;
+          progressTag = ' ' + progressColor(`[${completed}/${total}]`);
+        }
+
+        console.log(colors.dim(cardPrefix) + ' ' + card.title + progressTag + ' ' + sessionTag);
       });
     });
 

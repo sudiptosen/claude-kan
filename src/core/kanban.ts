@@ -3,14 +3,26 @@
  */
 
 import { KanbanStatus } from './types';
-import { getCardsByStatus } from './card';
+import { getCardsByStatus, parseCheckboxProgress } from './card';
+
+export interface KanbanCard {
+  path: string;
+  title: string;
+  session: string;
+  taskId?: string;
+  progress?: {
+    completed: number;
+    total: number;
+    percentage: number;
+  };
+}
 
 /**
  * Get all cards organized by status
  */
-export function getKanbanBoard(): Record<KanbanStatus, Array<{ path: string; title: string; session: string; taskId?: string }>> {
+export function getKanbanBoard(): Record<KanbanStatus, KanbanCard[]> {
   const statuses: KanbanStatus[] = ['pending', 'in_progress', 'completed', 'parkinglot', 'deleted'];
-  const board: Record<KanbanStatus, Array<{ path: string; title: string; session: string; taskId?: string }>> = {
+  const board: Record<KanbanStatus, KanbanCard[]> = {
     pending: [],
     in_progress: [],
     completed: [],
@@ -20,12 +32,26 @@ export function getKanbanBoard(): Record<KanbanStatus, Array<{ path: string; tit
 
   for (const status of statuses) {
     const cards = getCardsByStatus(status);
-    board[status] = cards.map(({ path, card }) => ({
-      path,
-      title: card.subject,
-      session: card.session,
-      taskId: card.taskId
-    }));
+    board[status] = cards.map(({ path, card }) => {
+      const kanbanCard: KanbanCard = {
+        path,
+        title: card.subject,
+        session: card.session,
+        taskId: card.taskId
+      };
+
+      // Add checkbox progress if card has steps
+      if (card.steps && card.steps.length > 0) {
+        const progress = parseCheckboxProgress(card.steps);
+        kanbanCard.progress = {
+          completed: progress.completed,
+          total: progress.total,
+          percentage: progress.percentage
+        };
+      }
+
+      return kanbanCard;
+    });
   }
 
   return board;

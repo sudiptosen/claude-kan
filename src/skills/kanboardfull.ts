@@ -100,8 +100,14 @@ function displayKanbanFull() {
             ? (isLastCard ? '   └─' : '   ├─')
             : (isLastCard ? '│  └─' : '│  ├─');
 
-          // Show full card title and full session ID
-          console.log(colors.dim(cardPrefix) + ' ' + colors.bold(card.title));
+          // Show full card title with progress
+          let titleDisplay = colors.bold(card.title);
+          if (card.progress && card.progress.total > 0) {
+            const { completed, total, percentage } = card.progress;
+            const progressColor = percentage === 100 ? colors.green : colors.cyan;
+            titleDisplay += ' ' + progressColor(`[${completed}/${total} - ${percentage}%]`);
+          }
+          console.log(colors.dim(cardPrefix) + ' ' + titleDisplay);
 
           // Show session details on next line
           const sessionPrefix = isLast
