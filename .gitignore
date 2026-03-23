@@ -15,3 +15,8 @@ coverage/
 .env.*
 .kanhelper/
 docs/tasks/
+
+# Claude Kanban
+.kanhelper/node_modules/
+.kanhelper/dist/
+docs/tasks/kb.html

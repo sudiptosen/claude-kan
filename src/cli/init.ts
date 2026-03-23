@@ -1,6 +1,15 @@
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
+import * as readline from 'readline';
+import {
+  detectInstallationType,
+  getCurrentVersion
+} from './version.js';
+import { createInstallationManifest } from './manifest.js';
+import { createBackup, cleanOldBackups } from './backup.js';
+import { runMigrations } from './migrations.js';
+import { rollbackFromPath } from './rollback.js';
 
 export interface InstallOptions {
   skipGitignore?: boolean;
@@ -9,34 +18,147 @@ export interface InstallOptions {
 export async function install(options: InstallOptions = {}) {
   const targetDir = process.cwd();
 
-  console.log('\n📦 Installing claude-kan...\n');
+  console.log('\n┌─────────────────────────────────────┐');
+  console.log(`│ 📦 Installing claude-kan v${getCurrentVersion()}     │`);
+  console.log('└─────────────────────────────────────┘\n');
+
+  // 1. Detect installation type
+  const context = detectInstallationType();
+  console.log(`✓ Detecting installation type... ${context.type.toUpperCase()}`);
+
+  // 2. Check for user data
+  if (context.hasUserData) {
+    console.log(`✓ Checking for user data... Found task cards`);
+  }
+
+  // 3. Check for modifications
+  if (context.hasModifications) {
+    console.log(`✓ Checking for modifications... ⚠️  Local modifications detected`);
+  }
+
+  // 4. Handle different installation types
+  if (context.type === 'downgrade') {
+    // Warn about downgrade
+    console.log(`\n⚠️  DOWNGRADE DETECTED\n`);
+    console.log(`You are attempting to install an older version:`);
+    console.log(`  Installed: v${context.installedVersion}`);
+    console.log(`  Package:   v${context.currentVersion}`);
+    console.log(`\nDowngrading may cause data compatibility issues.\n`);
+
+    const confirmed = await confirm('Are you sure you want to downgrade?');
+    if (!confirmed) {
+      console.log('❌ Installation cancelled by user');
+      return;
+    }
+  }
+
+  // 5. User confirmation for upgrades with data
+  if (context.type === 'upgrade' && context.hasUserData) {
+    console.log(`\n⚠️  This will upgrade your claude-kan installation:`);
+    console.log(`    From: v${context.installedVersion}`);
+    console.log(`    To:   v${context.currentVersion}`);
+    console.log(`\n    Your existing task cards will be preserved.`);
+    console.log(`    A backup will be created before proceeding.\n`);
+
+    const confirmed = await confirm('Continue with upgrade?');
+    if (!confirmed) {
+      console.log('❌ Installation cancelled by user');
+      return;
+    }
+    console.log('✓ User confirmed upgrade\n');
+  }
+
+  // 6. User confirmation for .kanhelper/dist/ modifications
+  if (context.hasModifications && context.type !== 'fresh') {
+    console.log(`\n⚠️  WARNING: Local modifications detected\n`);
+    console.log(`Files in .kanhelper/dist/ have been modified since installation.`);
+    console.log(`These customizations will be OVERWRITTEN during ${context.type}.\n`);
+    console.log(`Options:`);
+    console.log(`  1. Continue and overwrite modifications (backup will be created)`);
+    console.log(`  2. Cancel ${context.type} and preserve modifications\n`);
+
+    const choice = await prompt('What would you like to do? (1/2)');
+    if (choice !== '1') {
+      console.log('❌ Installation cancelled by user');
+      return;
+    }
+  }
+
+  // 7. Create backup (if not fresh install)
+  let backupPath: string | null = null;
+  if (context.type !== 'fresh') {
+    backupPath = await createBackup(`pre-${context.type}`);
+  }
 
   try {
-    // 1. Create directory structure
+    // 8. Create directory structure
     createDirectories(targetDir);
 
-    // 2. Copy skill templates
-    copySkillTemplates(targetDir);
+    // 9. Copy skills (ALWAYS overwrite - these are system files)
+    console.log('\n📝 Installing skills...');
+    copySkillTemplates(targetDir);  // No backup, no checks - just overwrite
 
-    // 3. Copy compiled code
-    copyCompiledCode(targetDir);
+    // 10. SAFE update of compiled code (replaces unsafe deletion at lines 100-102)
+    console.log('\n⚙️  Installing Kanban system...');
+    copyCompiledCodeSafe(targetDir);  // Backed up above if needed
 
-    // 4. Create initial task files
+    // 11. Create initial task files
     createTaskFiles(targetDir);
 
-    // 5. Update .gitignore
+    // 12. Update .gitignore
     if (!options.skipGitignore) {
       updateGitignore(targetDir);
     }
 
-    // 6. Run health check
+    // 13. Run migrations
+    if (context.type === 'upgrade' && context.installedVersion) {
+      await runMigrations(context.installedVersion, context.currentVersion);
+    }
+
+    // 14. Create or update installation manifest
+    createInstallationManifest(context);
+
+    // 15. Clean old backups
+    if (context.type !== 'fresh') {
+      await cleanOldBackups(5);
+    }
+
+    // 16. Run health check
+    console.log('\n🏥 Running health check...\n');
     const healthPassed = runHealthCheck(targetDir);
 
-    // 7. Show success message
+    // 17. Success message
+    console.log('\n' + '='.repeat(60));
+    console.log('✅ Installation complete!');
+    console.log('='.repeat(60) + '\n');
+
+    if (context.type === 'upgrade') {
+      console.log(`Upgraded from v${context.installedVersion} to v${context.currentVersion}`);
+      if (backupPath) {
+        console.log(`Backup saved at: ${backupPath}\n`);
+      }
+    }
+
     displaySuccessMessage(healthPassed);
 
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    console.error('\n❌ Installation failed:', message);
+
+    // Attempt automatic rollback
+    if (backupPath) {
+      console.log('\n🔄 Attempting automatic recovery...');
+      try {
+        await rollbackFromPath(backupPath);
+        console.log('✅ Recovered to previous state');
+      } catch (rollbackError) {
+        const rollbackMessage = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
+        console.error('❌ Recovery failed:', rollbackMessage);
+        console.log('\n💡 Manual recovery required:');
+        console.log(`   Restore from backup: ${backupPath}`);
+      }
+    }
+
     throw new Error(`Installation failed: ${message}`);
   }
 }
@@ -89,14 +211,14 @@ function copySkillTemplates(targetDir: string) {
   }
 }
 
-function copyCompiledCode(targetDir: string) {
-  console.log('\n⚙️  Installing Kanban system...');
-
+// SAFE version - replaces unsafe deletion at old lines 100-102
+function copyCompiledCodeSafe(targetDir: string) {
   // Copy dist folder
   const packageRoot = path.resolve(__dirname, '../..');
   const distSrc = path.join(packageRoot, 'dist');
   const distDest = path.join(targetDir, '.kanhelper', 'dist');
 
+  // If exists, it's already backed up at this point (if needed)
   if (fs.existsSync(distDest)) {
     fs.rmSync(distDest, { recursive: true });
   }
@@ -240,4 +362,34 @@ function copyRecursive(src: string, dest: string) {
   } else {
     fs.copyFileSync(src, dest);
   }
+}
+
+// Helper for user confirmation
+async function confirm(message: string): Promise<boolean> {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  return new Promise(resolve => {
+    rl.question(`${message} (Y/n) `, answer => {
+      rl.close();
+      resolve(answer.toLowerCase() !== 'n');
+    });
+  });
+}
+
+// Helper for user input
+async function prompt(message: string): Promise<string> {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  return new Promise(resolve => {
+    rl.question(message + ' ', answer => {
+      rl.close();
+      resolve(answer.trim());
+    });
+  });
 }
