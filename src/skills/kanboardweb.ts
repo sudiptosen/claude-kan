@@ -104,6 +104,8 @@ function generateReactHTML(): string {
   <!-- React Application -->
   <script type="text/babel">
     const { useState, useMemo, useEffect } = React;
+    const AUTO_REFRESH_SECONDS = 30;
+    const AUTO_REFRESH_INTERVAL_MS = AUTO_REFRESH_SECONDS * 1000;
 
     // Column configuration
     const COLUMNS = {
@@ -352,6 +354,7 @@ function generateReactHTML(): string {
     function App() {
       const [darkMode, setDarkMode] = useState(false);
       const [searchQuery, setSearchQuery] = useState('');
+      const [secondsUntilRefresh, setSecondsUntilRefresh] = useState(AUTO_REFRESH_SECONDS);
       const [collapsed, setCollapsed] = useState({
         parkinglot: true,
         deleted: true
@@ -377,6 +380,32 @@ function generateReactHTML(): string {
           setSelectedColumn(column);
         };
       }, []);
+
+      // Auto-refresh the static page every 30 seconds
+      useEffect(() => {
+        const secondTimer = setInterval(() => {
+          setSecondsUntilRefresh((prev) => (prev <= 1 ? AUTO_REFRESH_SECONDS : prev - 1));
+        }, 1000);
+
+        const refreshTimer = setInterval(() => {
+          window.location.reload();
+        }, AUTO_REFRESH_INTERVAL_MS);
+
+        return () => {
+          clearInterval(secondTimer);
+          clearInterval(refreshTimer);
+        };
+      }, []);
+
+      const handleManualRefresh = () => {
+        setSecondsUntilRefresh(AUTO_REFRESH_SECONDS);
+        window.location.reload();
+      };
+
+      const circleRadius = 14;
+      const circleCircumference = 2 * Math.PI * circleRadius;
+      const refreshProgress = secondsUntilRefresh / AUTO_REFRESH_SECONDS;
+      const strokeDashoffset = circleCircumference * (1 - refreshProgress);
 
       // Filter cards based on search query
       const filterCards = (cards) => {
@@ -415,15 +444,58 @@ function generateReactHTML(): string {
             <div className="container mx-auto px-4 py-6">
               <div className="flex items-center justify-between mb-4">
                 <h1 className="text-4xl font-bold font-mono text-gray-900 dark:text-gray-100">
-                  📋 KANBAN
+                  📋 K_BOARD
                 </h1>
-                <button
-                  onClick={() => setDarkMode(!darkMode)}
-                  className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                  title="Toggle dark mode"
-                >
-                  <span className="text-2xl">{darkMode ? '☀️' : '🌙'}</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleManualRefresh}
+                    className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-mono text-sm transition-colors"
+                    title="Refresh board now"
+                  >
+                    ↻ Refresh now
+                  </button>
+
+                  <div
+                    className="flex items-center gap-2 px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-700"
+                    title={"Auto-refresh in " + secondsUntilRefresh + "s"}
+                  >
+                    <svg width="32" height="32" viewBox="0 0 32 32" className="shrink-0">
+                      <circle
+                        cx="16"
+                        cy="16"
+                        r={circleRadius}
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        className="text-gray-300 dark:text-gray-600"
+                      />
+                      <circle
+                        cx="16"
+                        cy="16"
+                        r={circleRadius}
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        strokeDasharray={circleCircumference}
+                        strokeDashoffset={strokeDashoffset}
+                        strokeLinecap="round"
+                        transform="rotate(-90 16 16)"
+                        className="text-blue-600 dark:text-blue-400 transition-all duration-1000 linear"
+                      />
+                    </svg>
+                    <span className="text-xs font-mono text-gray-700 dark:text-gray-300 min-w-[2.5rem] text-right">
+                      {secondsUntilRefresh}s
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={() => setDarkMode(!darkMode)}
+                    className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                    title="Toggle dark mode"
+                  >
+                    <span className="text-2xl">{darkMode ? '☀️' : '🌙'}</span>
+                  </button>
+                </div>
               </div>
 
               {/* Search and filters */}
@@ -501,7 +573,7 @@ function generateReactHTML(): string {
           <div className="container mx-auto px-4 py-8">
             <div className="text-center text-sm font-mono text-gray-500 dark:text-gray-400 space-y-2">
               <div>Generated: {data.timestamp}</div>
-              <div>Run <code className="bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">/kanboardweb</code> to refresh</div>
+              <div>Auto-refreshes every {AUTO_REFRESH_SECONDS}s or use <code className="bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">Refresh now</code></div>
               <div className="text-xs">
                 Powered by React + Tailwind CSS (zero dependencies)
               </div>
@@ -585,6 +657,7 @@ function generateWebBoard() {
     console.log(colors.dim('   • Search & filter'));
     console.log(colors.dim('   • Collapsible columns'));
     console.log(colors.dim('   • Progress indicators'));
+    console.log(colors.dim('   • Auto-refresh every 30s + manual refresh button'));
     console.log(colors.dim('   • Click cards for details'));
     console.log('');
     console.log(colors.bold('🚀 Opening in browser...'));
@@ -593,7 +666,7 @@ function generateWebBoard() {
     // Open in browser
     openInBrowser(absolutePath);
 
-    console.log(colors.dim('💡 Tip: Run /kanboardweb again to refresh the view'));
+    console.log(colors.dim('💡 Tip: Board auto-refreshes every 30 seconds'));
     console.log('');
 
   } catch (error) {
