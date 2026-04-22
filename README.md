@@ -108,6 +108,105 @@ Cards are stored as git-committable markdown files in `docs/tasks/{status}/{sess
 - Run `/kanhelp` to see all available skills.
 - Run `/kandoctor` to validate your setup.
 - Task files live in `docs/tasks/` in your project.
+- **Fast-skills** (zero-token `/kanhelp`) is always on — `init` installs the
+  hook automatically. See [docs/FAST_SKILLS.md](docs/FAST_SKILLS.md) for
+  details and the diagnostic escape hatch.
+
+---
+
+## 🚢 Releasing (Maintainers)
+
+Releases are automated via scripts in `scripts/`. See [scripts/README.md](scripts/README.md) for full details.
+
+**Prerequisites:** `npm login` and a configured git remote.
+
+```bash
+# 1. Verify everything is ready (compiles, required files present, git state)
+npm run verify
+
+# 2. Preview the release without publishing
+npm run release:dry-run
+
+# 3. Publish (pick one based on the change type)
+npm run release         # patch: 1.0.4 → 1.0.5 (bug fixes)
+npm run release:minor   # minor: 1.0.4 → 1.1.0 (new features, backward compatible)
+npm run release:major   # major: 1.0.4 → 2.0.0 (breaking changes)
+```
+
+The release script runs verification, bumps the version in `package.json`, builds, commits the bump, creates a `vX.Y.Z` git tag, publishes to npm with `--access public`, and pushes commits + tags to GitHub.
+
+**After release:**
+
+```bash
+npm view claude-kan              # Confirm the new version is live
+npx claude-kan@latest init       # Smoke-test the published package
+```
+
+Optionally publish a GitHub Release at https://github.com/sudiptosen/claude-kan/releases/new against the new tag.
+
+### Manual patch release (step by step)
+
+If you prefer to run each step yourself instead of `npm run release`, follow these in order. Commands shown bump a **patch** version (e.g. `1.0.4 → 1.0.5`); swap `patch` for `minor` or `major` in step 3 as needed.
+
+1. **Confirm you're logged in to npm**
+   ```bash
+   npm whoami
+   # If this errors, run: npm login
+   ```
+
+2. **Start from a clean working tree on `main`**
+   ```bash
+   git checkout main
+   git pull --ff-only
+   git status                       # should report "nothing to commit, working tree clean"
+   ```
+
+3. **Run pre-release verification**
+   ```bash
+   npm run verify
+   ```
+   Fix any reported issues before continuing.
+
+4. **Bump the version in `package.json` (no tag yet)**
+   ```bash
+   npm version patch --no-git-tag-version
+   # Note the new version it prints, e.g. v1.0.5
+   ```
+
+5. **Build the package**
+   ```bash
+   npm run build
+   ```
+
+6. **Commit the version bump**
+   ```bash
+   git add package.json package-lock.json
+   git commit -m "Release v1.0.5"
+   ```
+
+7. **Create the matching git tag**
+   ```bash
+   git tag -a v1.0.5 -m "Release v1.0.5"
+   ```
+
+8. **Publish to npm**
+   ```bash
+   npm publish --access public
+   ```
+
+9. **Push the commit and tag to GitHub**
+   ```bash
+   git push origin main
+   git push origin --tags
+   ```
+
+10. **Verify the release**
+    ```bash
+    npm view claude-kan version     # should print 1.0.5
+    npx claude-kan@1.0.5 init       # smoke-test in a scratch directory
+    ```
+
+**If `npm publish` fails after you've already committed and tagged:** don't reset. Fix the underlying problem (auth, network, registry), then re-run only step 8 followed by step 9. The commit and tag are already correct for the version being published.
 
 ---
 

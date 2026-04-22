@@ -10,6 +10,7 @@ import { createInstallationManifest } from './manifest.js';
 import { createBackup, cleanOldBackups } from './backup.js';
 import { runMigrations } from './migrations.js';
 import { rollbackFromPath } from './rollback.js';
+import { installFastSkills } from './fastSkills.js';
 
 export interface InstallOptions {
   skipGitignore?: boolean;
@@ -110,24 +111,33 @@ export async function install(options: InstallOptions = {}) {
       updateGitignore(targetDir);
     }
 
-    // 13. Run migrations
+    // 13. Install fast-skills hook (user-global) — ALWAYS ON, no opt-out
+    console.log('\n⚡ Installing fast-skills hook...');
+    try {
+      installFastSkills({ log: (msg) => console.log(msg) });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`  ⚠️  Fast-skills install encountered an issue: ${message}`);
+    }
+
+    // 14. Run migrations
     if (context.type === 'upgrade' && context.installedVersion) {
       await runMigrations(context.installedVersion, context.currentVersion);
     }
 
-    // 14. Create or update installation manifest
+    // 15. Create or update installation manifest
     createInstallationManifest(context);
 
-    // 15. Clean old backups
+    // 16. Clean old backups
     if (context.type !== 'fresh') {
       await cleanOldBackups(5);
     }
 
-    // 16. Run health check
+    // 17. Run health check
     console.log('\n🏥 Running health check...\n');
     const healthPassed = runHealthCheck(targetDir);
 
-    // 17. Success message
+    // 18. Success message
     console.log('\n' + '='.repeat(60));
     console.log('✅ Installation complete!');
     console.log('='.repeat(60) + '\n');

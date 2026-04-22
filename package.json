@@ -8,8 +8,9 @@
     "claude-kan": "dist/cli/index.js"
   },
   "scripts": {
-    "build": "tsc && npm run copy-templates",
+    "build": "tsc && npm run copy-templates && npm run copy-hooks",
     "copy-templates": "cp -r src/templates dist/",
+    "copy-hooks": "mkdir -p dist/hooks && cp src/hooks/fast-skills.sh dist/hooks/ && cp src/hooks/fast-skills.config.json dist/hooks/ && chmod +x dist/hooks/fast-skills.sh",
     "prepublishOnly": "npm run build",
     "verify": "./scripts/verify-release.sh",
     "release": "./scripts/release.sh patch",

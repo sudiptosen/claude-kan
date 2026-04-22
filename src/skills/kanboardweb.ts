@@ -91,6 +91,13 @@ function generateReactHTML(): string {
     .dark ::-webkit-scrollbar-thumb:hover {
       background: #6b7280;
     }
+
+    /* On tablet/desktop, use exactly the visible column count so no empty tracks remain */
+    @media (min-width: 768px) {
+      .board-grid {
+        grid-template-columns: repeat(var(--visible-columns, 1), minmax(0, 1fr));
+      }
+    }
   </style>
 </head>
 <body>
@@ -555,8 +562,11 @@ function generateReactHTML(): string {
           </div>
 
           {/* Board */}
-          <div className="container mx-auto px-4 py-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+          <div className="w-full px-4 py-6">
+            <div
+              className="board-grid grid grid-cols-1 gap-4"
+              style={{ '--visible-columns': visibleColumns.length }}
+            >
               {visibleColumns.map(column => (
                 <Column
                   key={column}
