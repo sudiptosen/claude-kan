@@ -20,3 +20,8 @@ docs/tasks/
 .kanhelper/node_modules/
 .kanhelper/dist/
 docs/tasks/kb.html
+
+# Local scratch / generated artifacts
+.agents/
+output/
+tmp/
